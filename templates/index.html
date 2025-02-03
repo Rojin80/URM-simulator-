@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>URM Simulator (Flask)</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    
+   
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Poppins:400,500,700&display=swap">
+
+   
+    <style>
+      
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #f4f7f9;
+            color: #333;
+            margin: 0;
+            padding: 0;
+        }
+        
+      
+        .container {
+            width: 90%;
+            max-width: 900px;
+            margin: 40px auto;
+            background: white;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        h1 {
+            color: #2C3E50;
+            margin-bottom: 10px;
+        }
+
+      
+        .student-info {
+            font-size: 16px;
+            color: #555;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+
+        h2 {
+            color: #34495E;
+            margin-bottom: 8px;
+            text-align: left;
+        }
+
+        
+        form {
+            background: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        label {
+            font-weight: 500;
+            margin-bottom: 5px;
+            display: block;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            font-size: 14px;
+            border: 1px solid #bdc3c7;
+            border-radius: 5px;
+            margin-top: 5px;
+            transition: 0.3s;
+        }
+
+        input[type="text"]:focus {
+            border-color: #3498db;
+            outline: none;
+            box-shadow: 0 0 5px rgba(52, 152, 219, 0.5);
+        }
+
+    
+        .btn-container {
+            text-align: center;
+            margin-top: 15px;
+        }
+
+        button {
+            padding: 12px 18px;
+            margin: 5px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            background: #2980b9;
+        }
+
+        
+        .highlighted {
+            background-color: #f1c40f !important;
+            color: black;
+            font-weight: bold;
+            transition: background 0.4s ease;
+        }
+
+     
+        #program_container, #registers_container, #trace_output {
+            background: #fff;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        #trace_output {
+            min-height: 120px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+
+      
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: center;
+        }
+
+        table, td, th {
+            border: 1px solid #bdc3c7;
+        }
+
+        td, th {
+            padding: 10px;
+            font-size: 14px;
+        }
+        
+       
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>URM Simulator</h1>
+    <div class="student-info">
+        <p><strong>Name:</strong> Rojin Darafarin</p>
+        <p><strong>Student Number:</strong> 610399127</p>
+        <p><strong>Date:</strong> 14 Bahman 1403</p>
+    </div>
+
+   
+    <form method="POST" action="/">
+        <div>
+            <label for="encoded_instructions">Encoded URM Instructions:</label>
+            <input type="text" id="encoded_instructions" name="encoded_instructions" placeholder="Enter space-separated numbers">
+        </div>
+        <div>
+            <label for="inputs">Input Registers (R1, R2, ...):</label>
+            <input type="text" id="inputs" name="inputs" placeholder="Enter space-separated values">
+        </div>
+        <div class="btn-container">
+            <button type="submit">Decode and Initialize</button>
+        </div>
+    </form>
+
+    
+    {% if decoded_output %}
+    <h2>Decoded Program:</h2>
+    <div id="program_container" class="fade-in">
+        {{ decoded_output|safe }}
+    </div>
+    {% endif %}
+
+    <h2>Registers:</h2>
+    <div id="registers_container" class="fade-in">
+        {% if registers_table %}
+            {{ registers_table|safe }}
+        {% endif %}
+    </div>
+
+  
+    <h2>Simulation Trace:</h2>
+    <pre id="trace_output" class="fade-in">
+{% if trace_output %}
+{{ trace_output }}
+{% endif %}
+    </pre>
+
+    
+    <div class="btn-container">
+        <button id="next_step_btn">Next Step</button>
+        <button id="run_all_btn">Run All (Instant)</button>
+        <button id="run_delayed_btn">Run With Delay</button>
+    </div>
+</div>
+
+<script>
+$(document).ready(function() {
+
+  
+    $("#next_step_btn").click(function() {
+        $.post("/next_step", function(response) {
+            if (response.error) {
+                alert(response.error);
+            } else {
+                $("#trace_output").text(response.trace_output);
+                $("#registers_container").html(response.registers_table);
+                highlightInstruction(response.ip);
+            }
+        });
+    });
+
+  
+    $("#run_all_btn").click(function() {
+        $.post("/run_all", function(response) {
+            if (response.error) {
+                alert(response.error);
+            } else {
+                $("#trace_output").text(response.trace_output);
+                $("#registers_container").html(response.registers_table);
+                highlightInstruction(response.ip);
+            }
+        });
+    });
+
+  
+    $("#run_delayed_btn").click(function() {
+        runAllWithDelay(1000);
+    });
+
+    function runAllWithDelay(delayMs) {
+        function doOneStep() {
+            $.post("/next_step", function(response) {
+                if (response.error) {
+                    console.log("Stopped: " + response.error);
+                    return;
+                }
+                $("#trace_output").text(response.trace_output);
+                $("#registers_container").html(response.registers_table);
+                highlightInstruction(response.ip);
+                setTimeout(doOneStep, delayMs);
+            });
+        }
+        doOneStep();
+    }
+
+    function highlightInstruction(ip) {
+        $('div[id^="instr_"]').removeClass('highlighted');
+        $('#instr_' + ip).addClass('highlighted');
+    }
+
+});
+</script>
+
+</body>
+</html>
